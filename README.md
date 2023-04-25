@@ -20,11 +20,11 @@ Features include:
 | stg_ga4__event_items | Contains item data associated with e-commerce events (Purchase, add to cart, etc) |
 | stg_ga4__event_to_query_string_params | Mapping between each event and any query parameters & values that were contained in the event's `page_location` field |
 | stg_ga4__user_properties | Finds the most recent occurance of specified user_properties for each user |
-| stg_ga4__derived_user_properties | Finds the most recent occurance of specific event_params value and assigns them to a client_key. Derived user properties are specified as variables (see documentation below) |
+| stg_ga4__derived_user_properties | Finds the most recent occurance of specific event_params value and assigns them to a user_pseudo_id. Derived user properties are specified as variables (see documentation below) |
 | stg_ga4__derived_session_properties | Finds the most recent occurance of specific event_params or user_properties value and assigns them to a session's session_key. Derived session properties are specified as variables (see documentation below) |
 | stg_ga4__session_conversions_daily | Produces daily counts of conversions per session. The list of conversion events to include is configurable (see documentation below) |
 | stg_ga4__sessions_traffic_sources | Finds the first source, medium, campaign, content, paid search term (from UTM tracking), and default channel grouping for each session. |
-| dim_ga4__client_keys | Dimension table for user devices as indicated by client_keys. Contains attributes such as first and last page viewed.| 
+| dim_ga4__user_pseudo_ids | Dimension table for user devices as indicated by user_pseudo_ids. Contains attributes such as first and last page viewed.| 
 | dim_ga4__sessions | Dimension table for sessions which contains useful attributes such as geography, device information, and acquisition data. Can be expensive to run on large installs (see `dim_ga4__sessions_daily`) |
 | dim_ga4__sessions_daily | Query-optimized session dimension table that is incremental and partitioned on date. Assumes that each partition is contained within a single day |
 | fct_ga4__pages | Fact table for pages which aggregates common page metrics by page_location, date, and hour. |
@@ -268,7 +268,7 @@ Example:
 ```
 vars:
   ga4:
-    frequency: "daily+streaming"
+    frequency:"daily+streaming"
 ```
 
 # Connecting to BigQuery
@@ -310,8 +310,6 @@ vars:
 ```
 
 With these variables set, the `combine_property_data` macro will run as a pre-hook to `base_ga4_events` and clone shards to the target dataset.  The number of days' worth of data to clone during incremental runs will be based on the `static_incremental_days` variable. 
-
-When the frequency variable is set to `daily` or `daily+streaming`, the `events_*` tables will be copied and intraday tables will be ignored. When the frequency is set to `streaming`, only the `events_intraday_*` tables will be copied.
 
 Jobs that run a large number of clone operations are prone to timing out. As a result, it is recommended that you increase the query timeout if you need to backfill or full-refresh the table, when first setting up or when the base model gets modified. Otherwise, it is best to prevent the base model from rebuilding on full refreshes unless needed to minimize timeouts.
 

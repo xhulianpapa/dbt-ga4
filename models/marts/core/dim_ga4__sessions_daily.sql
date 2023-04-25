@@ -34,7 +34,7 @@
 with event_dimensions as 
 (
     select 
-        client_key,
+        user_pseudo_id,
         session_key,
         session_partition_key,
         event_date_dt as session_partition_date,

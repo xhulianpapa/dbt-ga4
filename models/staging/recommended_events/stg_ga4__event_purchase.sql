@@ -1,8 +1,3 @@
-{{
-  config(
-      enabled = false,
-  )
-}}
 with purchase_with_params as (
   select * except (ecommerce),
     ecommerce.total_item_quantity,
@@ -28,6 +23,21 @@ with purchase_with_params as (
     {% endif %}
  from {{ref('stg_ga4__events')}}
  where event_name = 'purchase'
+),
+
+add_trans_clean_number as (
+  select
+    *,
+    regexp_replace(transaction_id, r'(#|-IT|-CH|-ES|-DE)', '') as trans_clean_number
+  from purchase_with_params
 )
 
-select * from purchase_with_params
+select
+  *,
+  case when page_hostname = "dalfilo.com" then concat("#", trans_clean_number, "-IT")
+        when page_hostname = "dalfilo.de" then concat("#", trans_clean_number, "-DE")
+        when page_hostname = "dalfilo.ch" then concat("#", trans_clean_number, "-CH")
+        when page_hostname = "dalfilo.es" then concat("#", trans_clean_number, "-ES")
+        else "no_order_number" end as trans_shop_number
+from add_trans_clean_number
+qualify row_number() over (partition by session_partition_key, trans_clean_number)=1
