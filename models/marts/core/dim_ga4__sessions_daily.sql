@@ -1,35 +1,21 @@
-{% if var('static_incremental_days', false ) %}
-    {% set partitions_to_replace = ['current_date'] %}
-    {% for i in range(var('static_incremental_days')) %}
-        {% set partitions_to_replace = partitions_to_replace.append('date_sub(current_date, interval ' + (i+1)|string + ' day)') %}
-    {% endfor %}
-    {{
-        config(
-            materialized = 'incremental',
-            incremental_strategy = 'insert_overwrite',
-            tags = ["incremental"],
-            partition_by={
-                "field": "session_partition_date",
-                "data_type": "date",
-                "granularity": "day"
-            },
-            partitions = partitions_to_replace
-        )
-    }}
-{% else %}
-    {{
-        config(
-            materialized = 'incremental',
-            incremental_strategy = 'insert_overwrite',
-            tags = ["incremental"],
-            partition_by={
-                "field": "session_partition_date",
-                "data_type": "date",
-                "granularity": "day"
-            }
-        )
-    }}
-{% endif %}
+{% set partitions_to_replace = ['current_date'] %}
+{% for i in range(var('static_incremental_days')) %}
+    {% set partitions_to_replace = partitions_to_replace.append('date_sub(current_date, interval ' + (i+1)|string + ' day)') %}
+{% endfor %}
+{{
+    config(
+        materialized = 'incremental',
+        incremental_strategy = 'insert_overwrite',
+        tags = ["incremental"],
+        partition_by={
+            "field": "session_partition_date",
+            "data_type": "date",
+            "granularity": "day"
+        },
+        partitions = partitions_to_replace
+    )
+}}
+
 
 with event_dimensions as 
 (
@@ -74,11 +60,7 @@ with event_dimensions as
     where event_name != 'first_visit' 
     and event_name != 'session_start'
     {% if is_incremental() %}
-        {% if var('static_incremental_days', false ) %}
             and event_date_dt in ({{ partitions_to_replace | join(',') }})
-        {% else %}
-            and event_date_dt >= _dbt_max_partition
-        {% endif %}
     {% endif %}
 )
 ,traffic_sources as (
@@ -90,15 +72,19 @@ with event_dimensions as
         session_content,
         session_term,
         session_default_channel_grouping,
-        session_source_category
-    from {{ref('stg_ga4__sessions_traffic_sources_daily')}}
+        session_source_category,
+        -- last non-direct traffic sources
+        last_non_direct_source,
+        last_non_direct_medium,
+        last_non_direct_campaign,
+        last_non_direct_content,
+        last_non_direct_term,
+        last_non_direct_default_channel_grouping,
+        last_non_direct_source_category
+    from {{ref('stg_ga4__sessions_traffic_sources_last_non_direct_daily')}}
     where 1=1
     {% if is_incremental() %}
-        {% if var('static_incremental_days', false ) %}
             and session_partition_date in ({{ partitions_to_replace | join(',') }})
-        {% else %}
-            and session_partition_date >= _dbt_max_partition
-        {% endif %}
     {% endif %} 
 )
 {% if var('derived_session_properties', false) %}
@@ -108,11 +94,7 @@ with event_dimensions as
     from {{ref('stg_ga4__derived_session_properties_daily')}}
     where 1=1
     {% if is_incremental() %}
-        {% if var('static_incremental_days', false ) %}
-            and session_partition_date in ({{ partitions_to_replace | join(',') }})
-        {% else %}
-            and session_partition_date >= _dbt_max_partition
-        {% endif %}
+           and session_partition_date in ({{ partitions_to_replace | join(',') }})
     {% endif %}     
 )
 {% endif %}
@@ -167,7 +149,15 @@ with event_dimensions as
         session_content,
         session_term,
         session_default_channel_grouping,
-        session_source_category
+        session_source_category,
+        -- last non-direct traffic sources
+        last_non_direct_source,
+        last_non_direct_medium,
+        last_non_direct_campaign,
+        last_non_direct_content,
+        last_non_direct_term,
+        last_non_direct_default_channel_grouping,
+        last_non_direct_source_category
     from session_dimensions
     left join traffic_sources sessions_traffic_sources using (session_partition_key)
 )
